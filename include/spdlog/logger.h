@@ -52,7 +52,11 @@ public:
         _err_handler = [this](const std::string &msg) { this->_default_err_handler(msg); };
     }
 
-    virtual ~logger() = default;
+    virtual ~logger() = default;    
+
+    logger(const logger &) = delete;
+    
+    logger &operator=(const logger &) = delete;
 
     void set_formatter(spdlog::formatter_ptr msg_formatter)
     {
