@@ -59,7 +59,7 @@ public:
         _set_formatter(std::move(msg_formatter));
     }
 
-    void set_pattern(const std::string &pattern, pattern_time_type pattern_time)
+    void set_pattern(const std::string &pattern, pattern_time_type pattern_time = pattern_time_type::local)
     {
         _set_pattern(pattern, pattern_time);
     }
