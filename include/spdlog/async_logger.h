@@ -17,6 +17,7 @@
 
 #include "common.h"
 #include "logger.h"
+#include "details/async_log_helper.h"
 
 #include <chrono>
 #include <functional>
@@ -24,10 +25,6 @@
 #include <string>
 
 namespace spdlog {
-
-namespace details {
-class async_log_helper;
-}
 
 class async_logger SPDLOG_FINAL : public logger
 {
@@ -37,36 +34,93 @@ public:
         const async_overflow_policy overflow_policy = async_overflow_policy::block_retry,
         const std::function<void()> &worker_warmup_cb = nullptr,
         const std::chrono::milliseconds &flush_interval_ms = std::chrono::milliseconds::zero(),
-        const std::function<void()> &worker_teardown_cb = nullptr);
+        const std::function<void()> &worker_teardown_cb = nullptr) : 
+        logger(logger_name, begin, end), 
+        _async_log_helper(new details::async_log_helper(
+          _formatter, _sinks, queue_size, _err_handler, overflow_policy, worker_warmup_cb, flush_interval_ms, worker_teardown_cb))
+{
+}
 
-    async_logger(const std::string &logger_name, sinks_init_list sinks, size_t queue_size,
+    async_logger(const std::string &logger_name, sinks_init_list sinks_list, size_t queue_size,
         const async_overflow_policy overflow_policy = async_overflow_policy::block_retry,
         const std::function<void()> &worker_warmup_cb = nullptr,
         const std::chrono::milliseconds &flush_interval_ms = std::chrono::milliseconds::zero(),
-        const std::function<void()> &worker_teardown_cb = nullptr);
+        const std::function<void()> &worker_teardown_cb = nullptr) : 
+        async_logger(logger_name, sinks_list.begin(), sinks_list.end(), queue_size, overflow_policy, worker_warmup_cb, flush_interval_ms,
+          worker_teardown_cb)
+{
+}
+
 
     async_logger(const std::string &logger_name, sink_ptr single_sink, size_t queue_size,
         const async_overflow_policy overflow_policy = async_overflow_policy::block_retry,
         const std::function<void()> &worker_warmup_cb = nullptr,
         const std::chrono::milliseconds &flush_interval_ms = std::chrono::milliseconds::zero(),
-        const std::function<void()> &worker_teardown_cb = nullptr);
+        const std::function<void()> &worker_teardown_cb = nullptr) : 
+        async_logger(
+          logger_name, {std::move(single_sink)}, queue_size, overflow_policy, worker_warmup_cb, flush_interval_ms, worker_teardown_cb)
+{}
+
 
     // Wait for the queue to be empty, and flush synchronously
     // Warning: this can potentially last forever as we wait it to complete
-    void flush() override;
+    void flush() override
+    {
+        _async_log_helper->flush(true);
+    }
 
     // Error handler
-    void set_error_handler(log_err_handler) override;
-    log_err_handler error_handler() override;
+    void set_error_handler(log_err_handler err_handler) override
+    {
+    _err_handler = err_handler;
+    _async_log_helper->set_error_handler(err_handler);
+}
+
+    log_err_handler error_handler() override
+    {
+    return _err_handler;
+}
+
 
 protected:
-    void _sink_it(details::log_msg &msg) override;
-    void _set_formatter(spdlog::formatter_ptr msg_formatter) override;
-    void _set_pattern(const std::string &pattern, pattern_time_type pattern_time) override;
+    void _sink_it(details::log_msg &msg) override
+    {
+    try
+    {
+#if defined(SPDLOG_ENABLE_MESSAGE_COUNTER)
+        _incr_msg_counter(msg);
+#endif
+        _async_log_helper->log(msg);
+        if (_should_flush_on(msg))
+        {
+            _async_log_helper->flush(false); // do async flush
+        }
+    }
+    catch (const std::exception &ex)
+    {
+        _err_handler(ex.what());
+    }
+    catch (...)
+    {
+        _err_handler("Unknown exception in logger " + _name);
+        throw;
+    }
+}
+    void _set_formatter(spdlog::formatter_ptr msg_formatter) override
+    {
+    _formatter = msg_formatter;
+    _async_log_helper->set_formatter(_formatter);
+}
+
+    void _set_pattern(const std::string &pattern, pattern_time_type pattern_time) override
+    {
+    _formatter = std::make_shared<pattern_formatter>(pattern, pattern_time);
+    _async_log_helper->set_formatter(_formatter);
+}
 
 private:
     std::unique_ptr<details::async_log_helper> _async_log_helper;
 };
 } // namespace spdlog
 
-#include "details/async_logger_impl.h"
+
