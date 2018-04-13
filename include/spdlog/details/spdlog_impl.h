@@ -11,6 +11,7 @@
 #include "../details/registry.h"
 #include "../sinks/file_sinks.h"
 #include "../sinks/stdout_sinks.h"
+#include "../sinks/extend/hourly_file_sink.hpp"
 #include "../spdlog.h"
 #ifdef SPDLOG_ENABLE_SYSLOG
 #include "../sinks/syslog_sink.h"
@@ -81,6 +82,19 @@ inline std::shared_ptr<spdlog::logger> spdlog::daily_logger_st(
     const std::string &logger_name, const filename_t &filename, int hour, int minute)
 {
     return create<spdlog::sinks::daily_file_sink_st>(logger_name, filename, hour, minute);
+}
+
+//
+// Create file logger which creates new file hourly
+//
+inline std::shared_ptr<spdlog::logger> spdlog::hourly_logger_mt(const std::string& logger_name, const filename_t& filename)
+{
+    return create<spdlog::sinks::extend::hourly_file_sink_mt>(logger_name, filename);
+}
+
+inline std::shared_ptr<spdlog::logger> spdlog::hourly_logger_st(const std::string& logger_name, const filename_t& filename)
+{
+    return create<spdlog::sinks::extend::hourly_file_sink_st>(logger_name, filename);
 }
 
 //

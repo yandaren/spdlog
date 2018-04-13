@@ -92,6 +92,12 @@ std::shared_ptr<logger> daily_logger_mt(const std::string &logger_name, const fi
 std::shared_ptr<logger> daily_logger_st(const std::string &logger_name, const filename_t &filename, int hour = 0, int minute = 0);
 
 //
+// Create file logger which creates new file hourly
+//
+std::shared_ptr<logger> hourly_logger_mt(const std::string& logger_name, const filename_t& filename);
+std::shared_ptr<logger> hourly_logger_st(const std::string& logger_name, const filename_t& filename);
+
+//
 // Create and register stdout/stderr loggers
 //
 std::shared_ptr<logger> stdout_logger_mt(const std::string &logger_name);
